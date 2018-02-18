@@ -2,27 +2,20 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"github.com/morus12/dht22"
+	"github.com/d2r2/go-dht"
 	"log"
 )
 
 func main() {
-	gpioPtr := flag.String("gpio", "17", "gpio where the DHT22 is connected")
+	gpioPtr := flag.Int("gpio", 17, "gpio where the DHT22 is connected")
 	flag.Parse()
 
-	gpio := fmt.Sprintf("GPIO_%s", *gpioPtr)
-	log.Printf("reading sensor at %s", gpio)
-	sensor := dht22.New(gpio)
+	log.Printf("scaning sensor %d", *gpioPtr)
 
-	temperature, err := sensor.Temperature()
+	temperature, humidity, retried, err := dht.ReadDHTxxWithRetry(dht.DHT22, *gpioPtr, false, 10)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("temperature reading done")
-	humidity, err := sensor.Humidity()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("temperature %d°C, humidity %d%%", temperature, humidity)
+	log.Printf("Temperature = %v*C, Humidity = %v%% (retried %d times)\n",
+		temperature, humidity, retried)
 }
