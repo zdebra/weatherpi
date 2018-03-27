@@ -3,9 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
+	"fmt"
 	"github.com/d2r2/go-dht"
-	"github.com/pkg/errors"
 	"log"
 	"net/http"
 )
@@ -21,8 +22,10 @@ type bucket struct {
 }
 
 type dispatcher struct {
-	apiUrl string
-	room   string
+	apiUrl            string
+	room              string
+	basicAuthUsername string
+	basicAuthPassword string
 }
 
 func (d *dispatcher) sendData(temperature, humidity float32) error {
@@ -33,10 +36,13 @@ func (d *dispatcher) sendData(temperature, humidity float32) error {
 	}
 	marshaledBucket, _ := json.Marshal(b)
 	buf := bytes.NewBuffer(marshaledBucket)
-	resp, err := http.Post(d.apiUrl+"/store", "application/json", buf)
+
+	req, err := http.NewRequest(http.MethodPost, d.apiUrl+"/store", buf)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create http request for data payload: %v", err)
 	}
+	req.SetBasicAuth(d.basicAuthUsername, d.basicAuthPassword)
+	resp, err := http.DefaultClient.Do(req)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return ErrInvalidAPIResponse
@@ -46,8 +52,10 @@ func (d *dispatcher) sendData(temperature, humidity float32) error {
 
 func main() {
 	gpioPtr := flag.Int("gpio", 17, "gpio where the DHT22 is connected")
-	apiPtr := flag.String("api", "https://weatherpi:ZV3CzpCHGa3h6uC@development-195419.appspot.com", "api url")
+	apiPtr := flag.String("api", "http://35.205.150.247", "api url")
 	roomPtr := flag.String("room", "bedroom", "room where the sensor is located")
+	bAuthUsername := flag.String("username", "a", "api basic auth username")
+	bAuthPassword := flag.String("password", "b", "api basic auth password")
 	flag.Parse()
 
 	room := *roomPtr
@@ -56,11 +64,13 @@ func main() {
 	}
 
 	disp := dispatcher{
-		apiUrl: *apiPtr,
-		room:   room,
+		apiUrl:            *apiPtr,
+		room:              room,
+		basicAuthUsername: *bAuthUsername,
+		basicAuthPassword: *bAuthPassword,
 	}
 
-	log.Printf("scaning sensor %d", *gpioPtr)
+	log.Printf("scaning sensor %d, api basic auth username is %s", *gpioPtr, *bAuthUsername)
 
 	for {
 		temperature, humidity, retried, err := dht.ReadDHTxxWithRetry(dht.DHT22, *gpioPtr, false, 10)
