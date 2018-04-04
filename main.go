@@ -9,6 +9,7 @@ import (
 	"github.com/d2r2/go-dht"
 	"log"
 	"net/http"
+	"time"
 )
 
 var (
@@ -56,6 +57,7 @@ func main() {
 	roomPtr := flag.String("room", "bedroom", "room where the sensor is located")
 	bAuthUsername := flag.String("username", "a", "api basic auth username")
 	bAuthPassword := flag.String("password", "b", "api basic auth password")
+	sensorReadPeriodMs := flag.Int64("period", 2000, "sensor read period in miliseconds")
 	flag.Parse()
 
 	room := *roomPtr
@@ -70,9 +72,10 @@ func main() {
 		basicAuthPassword: *bAuthPassword,
 	}
 
-	log.Printf("scaning sensor %d, api basic auth username is %s", *gpioPtr, *bAuthUsername)
+	sensorReadPeriodDuration := time.Duration(*sensorReadPeriodMs) * time.Millisecond
+	log.Printf("scaning sensor %d every %d seconds, api basic auth username is %s", *gpioPtr, sensorReadPeriodDuration.Seconds(), *bAuthUsername)
 
-	for {
+	for range time.Tick(sensorReadPeriodDuration) {
 		temperature, humidity, retried, err := dht.ReadDHTxxWithRetry(dht.DHT22, *gpioPtr, false, 10)
 		if err != nil {
 			log.Fatal(err)
